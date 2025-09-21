@@ -1,25 +1,25 @@
-export function loadData() {
-  if (typeof window === 'undefined') {
-    return {
-      transactions: [],
-      monthlyResidents: {},
-      personList: [],
-      collector: { name: '', collected: 0, paid: 0, savings: 0, pending: {} },
-    };
-  }
+export async function loadData() {
+  const res = await fetch("/api/data");
+  if (!res.ok) throw new Error("Failed to fetch data");
+  const data = await res.json();
 
   return {
-    transactions: JSON.parse(localStorage.getItem('hostelTransactions')) || [],
-    monthlyResidents: JSON.parse(localStorage.getItem('monthlyResidents')) || {},
-    personList: JSON.parse(localStorage.getItem('personList')) || [],
-    collector: JSON.parse(localStorage.getItem('pgCollector')) || { name: '', collected: 0, paid: 0, savings: 0, pending: {} },
+    transactions: data.transactions || [],
+    users: data.users || [],
+    personList: data.personList || [],
+    monthlyResidents: data.monthlyResidents || {},
+    collector: data.collector || { name: "", collected: 0, paid: 0, savings: 0, pending: {} },
   };
 }
 
-export function saveData({ transactions, monthlyResidents, personList, collector }) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('hostelTransactions', JSON.stringify(transactions));
-  localStorage.setItem('monthlyResidents', JSON.stringify(monthlyResidents));
-  localStorage.setItem('personList', JSON.stringify(personList));
-  localStorage.setItem('pgCollector', JSON.stringify(collector));
+export async function saveData({ transactions, users, monthlyResidents, collector }) {
+  try {
+    await fetch("/api/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transactions, users, monthlyResidents, collector }),
+    });
+  } catch (err) {
+    console.error("Failed to save data:", err);
+  }
 }

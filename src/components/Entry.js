@@ -92,7 +92,9 @@ export default function Entry({ transactions, setTransactions, personList, colle
               <label>Payer</label>
               <select value={fromPerson} onChange={e => setFromPerson(e.target.value)}>
                 <option value="">Select Person</option>
-                {personList.map(p => <option key={p} value={p}>{p}</option>)}
+                {(personList || []).map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
               </select>
             </div>
             <div className="form-group">

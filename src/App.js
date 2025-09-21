@@ -13,7 +13,7 @@ import Summary from "./components/Summary";
 import Collector from "./components/Collector";
 import Settings from "./components/Settings";
 import { loadData, saveData } from "./utils/storage";
-import { loadUsers, saveUsers, generateOtp } from "./utils/userStorage";
+import { generateOtp } from "./utils/userStorage";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("records");
@@ -21,8 +21,8 @@ export default function App() {
   const [personList, setPersonList] = useState([]);
   const [collector, setCollector] = useState({});
   const [monthlyResidents, setMonthlyResidents] = useState({});
-  const [isClient, setIsClient] = useState(false);
   const [users, setUsers] = useState([]);
+  const [isClient, setIsClient] = useState(false);
 
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("login"); // login, register, otp
@@ -32,94 +32,105 @@ export default function App() {
 
   // Load app data and users
   useEffect(() => {
-    const data = loadData();
-    setTransactions(data.transactions);
-    setPersonList(data.personList);
-    setCollector(data.collector);
-    setMonthlyResidents(data.monthlyResidents);
+    async function fetchData() {
+      const data = await loadData();
 
-    const sessionUser = localStorage.getItem("pgUser");
-    if (sessionUser) setUser(JSON.parse(sessionUser));
+      setTransactions(data.transactions || []);
+      setPersonList(data.personList || []);
+      setCollector(data.collector || { name: "", collected: 0, paid: 0, savings: 0, pending: {} });
+      setMonthlyResidents(data.monthlyResidents || {});
+      let storedUsers = data.users || [];
 
-    let storedUsers = loadUsers();
-    // Ensure superadmin exists
-    if (!storedUsers.find((u) => u.username === "superadmin")) {
-      storedUsers.push({
-        username: "superadmin",
-        password: "admin123",
-        role: "admin",
-        otp: null,
-        isVerified: true,
-      });
-      saveUsers(storedUsers);
+      // Ensure superadmin exists
+      if (!storedUsers.find(u => u.username === "superadmin")) {
+        storedUsers.push({
+          username: "superadmin",
+          password: "admin123",
+          role: "admin",
+          otp: null,
+          isVerified: true,
+        });
+      }
+
+      setUsers(storedUsers);
+
+      // Check session user
+      const sessionUser = localStorage.getItem("pgUser");
+      if (sessionUser) setUser(JSON.parse(sessionUser));
+
+      setIsClient(true);
     }
-
-    setUsers(storedUsers);
-    setIsClient(true);
+    fetchData();
   }, []);
 
-  // Save transactions and app data
+  // Save data on changes
   useEffect(() => {
     if (!isClient) return;
-    saveData({ transactions, personList, collector, monthlyResidents });
-  }, [transactions, personList, collector, monthlyResidents, isClient]);
+    saveData({ transactions, users, monthlyResidents, collector }).catch(err =>
+      console.error("Failed to save data:", err)
+    );
+  }, [transactions, personList, collector, monthlyResidents, users, isClient]);
 
-  if (!isClient) return null;
-
+  // Logout
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem("pgUser");
-
-    // Reset auth state
-    setAuthMode("login");      // redirect to login page
-    setUsername("");           // clear username field
-    setPassword("");           // clear password field
-    setOtpInput("");           // clear OTP field
+    setAuthMode("login");
+    setUsername("");
+    setPassword("");
+    setOtpInput("");
   };
 
+  // Login
   const handleLogin = () => {
-    const existingUser = users.find((u) => u.username === username);
+    const existingUser = users.find(u => u.username === username);
     if (!existingUser) return alert("User not found");
     if (existingUser.password !== password) return alert("Invalid password");
     if (!existingUser.isVerified) return setAuthMode("otp");
+
     localStorage.setItem("pgUser", JSON.stringify(existingUser));
     setUser(existingUser);
   };
 
-  const handleRegister = () => {
-    if (users.find((u) => u.username === username)) return alert("Username exists");
+  // Register
+  const handleRegister = async () => {
+    if (users.find(u => u.username === username)) return alert("Username exists");
+
     const otp = generateOtp();
     const newUser = { username, password, role: "user", otp, isVerified: false };
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
-    saveUsers(updatedUsers);
+
+    await saveData({ transactions, users: updatedUsers, monthlyResidents, collector });
+
     setAuthMode("otp");
   };
 
-  const handleOTPVerify = () => {
-    const updatedUsers = users.map((u) => {
+  // Verify OTP
+  const handleOTPVerify = async () => {
+    const updatedUsers = users.map(u => {
       if (u.username === username && u.otp === otpInput) {
         return { ...u, isVerified: true, otp: null };
       }
       return u;
     });
-    setUsers(updatedUsers);
-    saveUsers(updatedUsers);
 
-    const verifiedUser = updatedUsers.find((u) => u.username === username);
-    if (verifiedUser.isVerified) {
+    setUsers(updatedUsers);
+    await saveData({ transactions, users: updatedUsers, monthlyResidents, collector });
+
+    const verifiedUser = updatedUsers.find(u => u.username === username);
+    if (verifiedUser && verifiedUser.isVerified) {
       localStorage.setItem("pgUser", JSON.stringify(verifiedUser));
       setUser(verifiedUser);
-
       setOtpInput("");
-
       alert("Registration completed!");
     } else {
       alert("Invalid OTP");
     }
   };
 
-  const resendOtp = (username) => {
+  // Resend OTP
+  const resendOtp = async (username) => {
     const updatedUsers = users.map(u => {
       if (u.username === username && !u.isVerified) {
         return { ...u, otp: generateOtp() };
@@ -127,16 +138,18 @@ export default function App() {
       return u;
     });
     setUsers(updatedUsers);
-    saveUsers(updatedUsers);
+    await saveData({ transactions, users: updatedUsers, monthlyResidents, collector });
+
     const u = updatedUsers.find(u => u.username === username);
     alert(`New OTP for ${username}: ${u.otp}`);
   };
 
-  const deleteUser = (username) => {
+  // Delete User
+  const deleteUser = async (username) => {
     if (!window.confirm(`Delete user ${username}?`)) return;
     const updatedUsers = users.filter(u => u.username !== username);
     setUsers(updatedUsers);
-    saveUsers(updatedUsers);
+    await saveData({ transactions, users: updatedUsers, monthlyResidents, collector });
   };
 
   // Render login/register/OTP pages
@@ -185,14 +198,12 @@ export default function App() {
   const userTabs =
     user.role === "admin"
       ? [...allTabs, { id: "users", label: "👥 Users" }]
-      : allTabs.filter((t) =>
-        ["records", "summary", "collector"].includes(t.id)
-      );
+      : allTabs.filter(t => ["records", "summary", "collector"].includes(t.id));
 
   const renderTab = () => {
     switch (activeTab) {
       case "entry":
-        return <Entry transactions={transactions} setTransactions={setTransactions} personList={personList} collector={collector} setCollector={setCollector} />;
+        return <Entry transactions={transactions} setTransactions={setTransactions} personList={personList || []} collector={collector} setCollector={setCollector} />;
       case "records":
         return <Records transactions={transactions} setTransactions={setTransactions} collector={collector} setCollector={setCollector} />;
       case "summary":
@@ -201,7 +212,7 @@ export default function App() {
         return <Collector collector={collector} />;
       case "settings":
         return <Settings
-          personList={personList}
+          personList={personList || []}
           setPersonList={setPersonList}
           collector={collector}
           setCollector={setCollector}
@@ -211,7 +222,7 @@ export default function App() {
           setUsers={setUsers}
         />;
       case "users":
-        return <UserList users={users} resendOtp={resendOtp} deleteUser={deleteUser} />;
+        return <UserList users={users || []} resendOtp={resendOtp} deleteUser={deleteUser} />;
       default:
         return null;
     }

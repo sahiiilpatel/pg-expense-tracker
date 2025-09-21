@@ -1,0 +1,9 @@
+[
+  {
+    "username": "superadmin",
+    "password": "admin123",
+    "role": "admin",
+    "otp": null,
+    "isVerified": true
+  }
+]
