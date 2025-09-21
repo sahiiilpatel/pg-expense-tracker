@@ -3,7 +3,7 @@ export function loadData() {
     return {
       transactions: [],
       monthlyResidents: {},
-      personList: ['Person A', 'Person B', 'Person C', 'Person D'],
+      personList: [],
       collector: { name: '', collected: 0, paid: 0, savings: 0, pending: {} },
     };
   }
@@ -11,7 +11,7 @@ export function loadData() {
   return {
     transactions: JSON.parse(localStorage.getItem('hostelTransactions')) || [],
     monthlyResidents: JSON.parse(localStorage.getItem('monthlyResidents')) || {},
-    personList: JSON.parse(localStorage.getItem('personList')) || ['Person A', 'Person B', 'Person C', 'Person D'],
+    personList: JSON.parse(localStorage.getItem('personList')) || [],
     collector: JSON.parse(localStorage.getItem('pgCollector')) || { name: '', collected: 0, paid: 0, savings: 0, pending: {} },
   };
 }

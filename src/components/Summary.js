@@ -5,8 +5,13 @@ import React, { useState } from 'react';
 export default function Summary({ transactions }) {
   const [summaryMonth, setSummaryMonth] = useState(new Date().toISOString().slice(0,7));
 
-  const collections = transactions.filter(t => t.type==='collection' && t.rentMonth===summaryMonth);
-  const expenses = transactions.filter(t => t.type==='expense' && t.collectionDate.startsWith(summaryMonth));
+  const collections = transactions.filter(
+    t => t.type==='collection' && t.rentMonth===summaryMonth
+  );
+
+  const expenses = transactions.filter(
+    t => t.type==='expense' && t.month===summaryMonth
+  );
 
   const totalCollected = collections.reduce((sum,t)=>sum+(t.status==='paid'?t.amount:0),0);
   const totalExpenses = expenses.reduce((sum,t)=>sum+t.amount,0);
@@ -32,7 +37,9 @@ export default function Summary({ transactions }) {
           </div>
           <div className="summary-card">
             <h3>📊 Net</h3>
-            <div className={`amount ${net>=0?'balance-positive':'balance-negative'}`}>₹{net.toFixed(2)}</div>
+            <div className={`amount ${net>=0?'balance-positive':'balance-negative'}`}>
+              ₹{net.toFixed(2)}
+            </div>
           </div>
         </div>
       </div>

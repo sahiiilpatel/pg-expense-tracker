@@ -43,7 +43,7 @@ export default function Settings({ personList, setPersonList, collector, setColl
 
   const clearAllData = () => {
     if (!window.confirm('Clear all?')) return;
-    setPersonList(['Person A','Person B','Person C','Person D']);
+    setPersonList([]);
     setCollector({name:'',collected:0,paid:0,savings:0,pending:{}});
     setMonthlyResidents({});
   };
