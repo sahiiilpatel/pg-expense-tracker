@@ -1,28 +1,43 @@
-import { readJSON, writeJSON } from "../../../utils/fileStorage";
+import clientPromise from "../../../utils/mongo";
 
 export async function GET(req) {
-  const transactions = readJSON("transactions.json") || [];
-  const users = readJSON("users.json") || [];
-  const monthlyResidents = readJSON("monthlyResidents.json") || {};
-  const collector = readJSON("collector.json") || { name: "", collected: 0, paid: 0, savings: 0, pending: {} };
+  try {
+    const client = await clientPromise;
+    const db = client.db("pgtracker");
+    console.log("Connected to MongoDB in GET API");
+    const collection = db.collection("appData");
 
-  return new Response(JSON.stringify({ transactions, users, monthlyResidents, collector }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+    const data = await collection.findOne({ _id: "main" });
+    return new Response(JSON.stringify(data || {
+      _id: "main",
+      transactions: [],
+      users: [],
+      personList: [],
+      monthlyResidents: {},
+      collector: { name: "", collected: 0, paid: 0, savings: 0, pending: {} },
+    }), { status: 200 });
+  } catch (err) {
+    console.error("DB connection error:", err);
+    return new Response(JSON.stringify({ error: "Internal Server Error" }), { status: 500 });
+  }
 }
 
 export async function POST(req) {
-  const body = await req.json();
-  const { transactions, users, monthlyResidents, collector } = body;
+  try {
+    const { transactions, users, personList, monthlyResidents, collector } = await req.json();
+    const client = await clientPromise;
+    const db = client.db("pgtracker");
+    const collection = db.collection("appData");
 
-  if (transactions) writeJSON("transactions.json", transactions);
-  if (users) writeJSON("users.json", users);
-  if (monthlyResidents) writeJSON("monthlyResidents.json", monthlyResidents);
-  if (collector) writeJSON("collector.json", collector);
+    await collection.updateOne(
+      { _id: "main" },
+      { $set: { transactions, users, personList, monthlyResidents, collector } },
+      { upsert: true }
+    );
 
-  return new Response(JSON.stringify({ message: "Data saved" }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+    return new Response(JSON.stringify({ message: "Data saved" }), { status: 200 });
+  } catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: "Internal Server Error" }), { status: 500 });
+  }
 }
